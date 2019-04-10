@@ -48,6 +48,14 @@
 #define ITERM_RELAX_SETPOINT_THRESHOLD 40.0f
 #define ITERM_RELAX_CUTOFF_DEFAULT 20
 
+#define TPID_CURVE_POINTS 8
+
+typedef enum {
+    TPID_CURVE_P = 0,
+    TPID_CURVE_I,
+    TPID_CURVE_D
+} pidCurve_e;
+
 typedef enum {
     PID_ROLL,
     PID_PITCH,
@@ -168,6 +176,9 @@ typedef struct pidProfile_s {
     uint8_t motor_output_limit;             // Upper limit of the motor output (percent)
     int8_t auto_profile_cell_count;         // Cell count for this profile to be used with if auto PID profile switching is used
     uint8_t transient_throttle_limit;       // Maximum DC component of throttle change to mix into throttle to prevent airmode mirroring noise
+    uint8_t tpid_curve_p[TPID_CURVE_POINTS];
+    uint8_t tpid_curve_i[TPID_CURVE_POINTS];
+    uint8_t tpid_curve_d[TPID_CURVE_POINTS];
 } pidProfile_t;
 
 PG_DECLARE_ARRAY(pidProfile_t, PID_PROFILE_COUNT, pidProfiles);

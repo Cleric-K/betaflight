@@ -55,6 +55,7 @@ typedef float (applyRatesFn)(const int axis, float rcCommandf, const float rcCom
 
 static float setpointRate[3], rcDeflection[3], rcDeflectionAbs[3];
 static float throttlePIDAttenuation;
+static float throttlePIDScale[3];
 static bool reverseMotors = false;
 static applyRatesFn *applyRates;
 uint16_t currentRxRefreshRate;
@@ -100,6 +101,11 @@ float getRcDeflectionAbs(int axis)
 float getThrottlePIDAttenuation(void)
 {
     return throttlePIDAttenuation;
+}
+
+float* getThrottlePIDScale(void)
+{
+    return throttlePIDScale;
 }
 
 #define THROTTLE_LOOKUP_LENGTH 12
@@ -578,6 +584,19 @@ FAST_CODE void processRcCommand(void)
         // Scaling of AngleRate to camera angle (Mixing Roll and Yaw)
         if (rxConfig()->fpvCamAngleDegrees && IS_RC_MODE_ACTIVE(BOXFPVANGLEMIX) && !FLIGHT_MODE(HEADFREE_MODE)) {
             scaleRcCommandToFpvCamAngle();
+        }
+
+        uint8_t *tPIDCurves[] = { currentPidProfile->tpid_curve_p, currentPidProfile->tpid_curve_i, currentPidProfile->tpid_curve_d};
+        int thr = rcCommand[THROTTLE] - 1000;
+        int slotSize = 1000 / (TPID_CURVE_POINTS - 1);
+        int pidSlot = constrain(thr / slotSize, 0, TPID_CURVE_POINTS - 2);
+        int pidOffset = thr - pidSlot * slotSize;
+        for (int pid = TPID_CURVE_P; pid <= TPID_CURVE_D; pid++) {
+            uint8_t p1 = tPIDCurves[pid][pidSlot];
+            uint8_t p2 = tPIDCurves[pid][pidSlot + 1];
+            int scale = p1 + (p2 - p1)* pidOffset / slotSize;
+            throttlePIDScale[pid] = scale / 100.0f;
+            DEBUG_SET(DEBUG_TPID_CURVE, pid, scale);
         }
     }
 

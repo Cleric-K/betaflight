@@ -204,6 +204,9 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .motor_output_limit = 100,
         .auto_profile_cell_count = AUTO_PROFILE_CELL_COUNT_STAY,
         .transient_throttle_limit = 15,
+        .tpid_curve_p = {100, 100, 100, 100, 100, 100, 100, 100},
+        .tpid_curve_i = {100, 100, 100, 100, 100, 100, 100, 100},
+        .tpid_curve_d = {100, 100, 100, 100, 100, 100, 100, 100},
     );
 #ifndef USE_D_MIN
     pidProfile->pid[PID_ROLL].D = 30;
@@ -1223,7 +1226,8 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
     static bool gpsRescuePreviousState = false;
 #endif
 
-    const float tpaFactor = getThrottlePIDAttenuation();
+    const float tpaFactor = 1.0f; //getThrottlePIDAttenuation();
+    const float *tpidScale = getThrottlePIDScale();
 
 #if defined(USE_ACC)
     const rollAndPitchTrims_t *angleTrim = &accelerometerConfig()->accelerometerTrims;
@@ -1354,7 +1358,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         // b = 1 and only c (feedforward weight) can be tuned (amount derivative on measurement or error).
 
         // -----calculate P component
-        pidData[axis].P = pidCoefficient[axis].Kp * errorRate * tpaFactorKp;
+        pidData[axis].P = pidCoefficient[axis].Kp * errorRate * tpaFactorKp * tpidScale[TPID_CURVE_P];
         if (axis == FD_YAW) {
             pidData[axis].P = ptermYawLowpassApplyFn((filter_t *) &ptermYawLowpass, pidData[axis].P);
         }
@@ -1366,7 +1370,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 #else
         const float Ki = pidCoefficient[axis].Ki;
 #endif
-        pidData[axis].I = constrainf(previousIterm + Ki * itermErrorRate * dynCi, -itermLimit, itermLimit);
+        pidData[axis].I = constrainf(previousIterm + Ki * itermErrorRate * dynCi * tpidScale[TPID_CURVE_I], -itermLimit, itermLimit);
 
         // -----calculate pidSetpointDelta
         float pidSetpointDelta = 0;
@@ -1414,7 +1418,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
                 }
             }
 #endif
-            pidData[axis].D = pidCoefficient[axis].Kd * delta * tpaFactor * dMinFactor;
+            pidData[axis].D = pidCoefficient[axis].Kd * delta * tpaFactor * dMinFactor * tpidScale[TPID_CURVE_D];
         } else {
             pidData[axis].D = 0;
         }
